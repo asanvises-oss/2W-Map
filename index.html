@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ไกด์ร้านยางมอเตอร์ไซค์ กรุงเทพฯ</title>
+<meta name="description" content="แผนที่ร้านที่เปลี่ยนยางมอเตอร์ไซค์ได้ในกรุงเทพฯ จัดอันดับด้วยคะแนนและรีวิวจาก Google Maps">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;700&family=Prompt:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="vendor/maplibre-gl.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand"><b>ไกด์ร้านยาง</b><i>MOTO</i></div>
+  <div class="meta" id="meta"></div>
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" aria-selected="true" id="tabMap">แผนที่ร้าน</button>
+    <button class="tab" role="tab" aria-selected="false" id="tabSum">สรุปจำนวนร้าน</button>
+  </div>
+  <div class="total"><span id="tot"></span> <small>ร้าน</small></div>
+</header>
+<div class="filters" id="filters">
+  <input type="search" id="q" placeholder="ค้นหาชื่อร้าน" aria-label="ค้นหาชื่อร้าน">
+  <button class="near" id="near">ใกล้ฉัน</button>
+  <select id="dist" aria-label="เขต"></select>
+  <select id="typ" aria-label="ประเภทร้าน"></select>
+  <span class="sep"></span>
+  <button class="chip" data-t="-1" aria-pressed="true">ทุกระดับ</button>
+  <button class="chip" data-t="0" aria-pressed="false">4.5+</button>
+  <button class="chip" data-t="1" aria-pressed="false">4.0–4.4</button>
+  <button class="chip" data-t="2" aria-pressed="false">ต่ำกว่า 4.0</button>
+  <button class="chip" data-t="3" aria-pressed="false">ยังไม่มีรีวิว</button>
+  <span class="sep"></span>
+  <button class="chip" id="cMany" aria-pressed="false">★ รีวิวเยอะ 30+</button>
+  <button class="chip" id="cNet" aria-pressed="false" style="display:none">เครือข่ายมิชลิน</button>
+  <button class="chip" id="cTc" aria-pressed="false">รวมร้านปิดชั่วคราว</button>
+  <button class="tg" id="cView" aria-pressed="false"><span class="sw"></span>เฉพาะที่เห็นบนแผนที่</button>
+</div>
+<main id="main">
+  <div class="mapwrap" id="mapwrap">
+    <div id="map"></div>
+    <div class="legend" id="legend"></div>
+  </div>
+  <section class="right" id="right">
+    <div class="rh"><span id="rt"></span><span id="rs"></span></div>
+    <ol class="list" id="list"></ol>
+  </section>
+  <section id="sum"></section>
+</main>
+<script src="vendor/maplibre-gl.js"></script>
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
