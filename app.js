@@ -1,6 +1,6 @@
 /* Michelin tire shop guide. Data: data.js (DATA). Map: MapLibre GL + OpenFreeMap tiles. */
 const TIERS=[['4.5 ขึ้นไป','#0f7b6c','--t1'],['4.0–4.4','#c98f00','--t2'],['ต่ำกว่า 4.0','#d4582a','--t3'],['ยังไม่มีรีวิว','#8b97a3','--t4']];
-const S=DATA.shops.map(a=>({name:a[0],ty:a[1],di:a[2],lat:a[3],lng:a[4],r:a[5],v:a[6],w:a[7],t:a[8],tc:a[11],id:a[12],ph:a[13],sd:a[14],net:a[15]}));
+const S=DATA.shops.map(a=>({name:a[0],ty:a[1],di:a[2],lat:a[3],lng:a[4],r:a[5],v:a[6],w:a[7],t:a[8],tc:a[11],id:a[12],ph:a[13],sd:a[14],net:a[15],ds:a[16]||0}));
 const $=id=>document.getElementById(id);
 const fmt=n=>n.toLocaleString('en-US');
 const esc=t=>String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -8,12 +8,18 @@ const vol=s=>s.v>=30?0:(s.v>0?1:2);
 const VOLS=['รีวิวเยอะ (30+)','รีวิวปานกลาง (1–29)','ยังไม่มีรีวิว'];
 S.forEach(s=>{s.icon=vol(s)===0?'star-'+s.t:vol(s)===1?'dot-'+s.t:'ring';});
 const HASNET=S.some(s=>s.net);
-const st={tier:-1,dist:'',typ:'',q:'',tc:false,many:false,net:false,view:false,sel:null,shown:60};
+const st={tier:-1,dist:'',typ:'',q:'',tc:false,many:false,net:false,ds:'',view:false,sel:null,shown:60};
 $('meta').textContent=`${DATA.districts.length} เขต · ข้อมูลคะแนนและรีวิวจาก Google Maps`;
 $('tot').textContent=fmt(S.length);
 $('dist').innerHTML='<option value="">ทุกเขต</option>'+DATA.districts.map((d,i)=>`<option value="${i}">${d} (${S.filter(s=>s.di===i).length})</option>`).join('');
 $('typ').innerHTML='<option value="">ทุกประเภทร้าน</option>'+DATA.types.map((d,i)=>`<option value="${i}">${d}</option>`).join('');
 if(HASNET)$('cNet').style.display='';
+// Distributor filter (network shops only); built here so index.html needs no change
+const DS=DATA.distributors||[];
+if(DS.length){const sel=document.createElement('select');sel.id='dsel';sel.setAttribute('aria-label','ค้าส่งของร้านเครือข่ายมิชลิน');
+  const cnt=i=>S.filter(s=>s.net&&s.ds===i).length;
+  sel.innerHTML='<option value="">ค้าส่ง (เครือข่ายมิชลิน)</option>'+DS.map((d,i)=>`<option value="${i+1}">${d} (${cnt(i+1)})</option>`).join('')+`<option value="0">ยังไม่ทราบค้าส่ง (${cnt(0)})</option>`;
+  $('typ').after(sel);sel.onchange=e=>{st.ds=e.target.value;upd();};}
 
 // ---- map ----
 const params=new URLSearchParams(location.search);
@@ -60,11 +66,20 @@ map.on('load',()=>{
   for(const l of ['clusters','points'])map.on('mouseenter',l,e=>{map.getCanvas().style.cursor='pointer';
     if(l==='points'){const s=byId.get(e.features[0].properties.id);if(!s)return;
       popup=new maplibregl.Popup({closeButton:false,offset:14}).setLngLat(e.features[0].geometry.coordinates)
-        .setHTML(`<b>${esc(s.name)}</b><br>${s.v?`★ ${s.r.toFixed(1)} (${fmt(s.v)} รีวิว)`:'ยังไม่มีรีวิว'}${s.net?'<br><b style="color:#1f4fa3">เครือข่ายมิชลิน</b>':''}`).addTo(map);}});
+        .setHTML(`<b>${esc(s.name)}</b><br>${s.v?`★ ${s.r.toFixed(1)} (${fmt(s.v)} รีวิว)`:'ยังไม่มีรีวิว'}${s.net?'<br><b style="color:#1f4fa3">เครือข่ายมิชลิน</b>'+(s.ds?' · '+esc(DS[s.ds-1]):''):''}`).addTo(map);}});
   for(const l of ['clusters','points'])map.on('mouseleave',l,()=>{map.getCanvas().style.cursor='';if(popup){popup.remove();popup=null;}});
+  // Network shops: if michelin-icon.png sits next to index.html, use it as the marker; otherwise keep the blue ring.
+  map.loadImage('michelin-icon.png').then(img=>{
+    const d=img.data;map.addImage('net-logo',d);
+    map.addLayer({id:'net-logo',type:'symbol',source:'shops',filter:['all',['!',['has','point_count']],['==',['get','net'],1]],
+      layout:{'icon-image':'net-logo','icon-size':34/Math.max(d.width,d.height),'icon-allow-overlap':true}},'sel');
+    map.setLayoutProperty('net-ring','visibility','none');
+    map.setFilter('points',['all',['!',['has','point_count']],['!=',['get','net'],1]]);
+    NETLOGO=true;legend();
+  }).catch(()=>{});
   mapReady=true;renderList();
 });
-let mapReady=false;
+let mapReady=false;var NETLOGO=false;
 map.on('moveend',()=>{if(st.view)renderList();});
 map.on('error',e=>{if(e&&e.error&&/tiles|style|glyph/i.test(String(e.error.message||'')))console.warn('basemap:',e.error.message);});
 
@@ -76,6 +91,7 @@ function pass(s,ignoreView){
   if(st.typ!==''&&s.ty!==+st.typ)return false;
   if(st.many&&vol(s)!==0)return false;
   if(st.net&&!s.net)return false;
+  if(st.ds!==''&&!(s.net&&s.ds===+st.ds))return false;
   if(st.q&&!s.name.toLowerCase().includes(st.q.toLowerCase()))return false;
   if(st.view&&!ignoreView&&mapReady&&!map.getBounds().contains([s.lng,s.lat]))return false;
   return true;
@@ -93,7 +109,7 @@ function renderList(){
   $('list').innerHTML=sh.map((s,i)=>`<li class="item${s.net?' net':''}${st.sel===s?' sel':''}" data-i="${i}" tabindex="0">
     <div class="rk${s.rk&&s.rk<=3?' top':''}">${s.rk||'–'}</div>
     <div><div class="nm">${esc(s.name)}</div><div class="loc">${DATA.districts[s.di]} · ${s.v?fmt(s.v)+' รีวิว':'ยังไม่มีรีวิว'}</div>
-      <div class="tags"><span class="tag">${DATA.types[s.ty]}</span>${s.net?'<span class="tag n">เครือข่ายมิชลิน</span>':''}${s.tc?'<span class="tag w">ปิดชั่วคราว</span>':''}${vol(s)===0?'<span class="tag">★ รีวิวเยอะ</span>':''}</div></div>
+      <div class="tags"><span class="tag">${DATA.types[s.ty]}</span>${s.net?'<span class="tag n">เครือข่ายมิชลิน</span>':''}${s.net&&s.ds?`<span class="tag">ค้าส่ง: ${esc(DS[s.ds-1])}</span>`:''}${s.tc?'<span class="tag w">ปิดชั่วคราว</span>':''}${vol(s)===0?'<span class="tag">★ รีวิวเยอะ</span>':''}</div></div>
     <div class="score s${s.t}">${s.v?s.w.toFixed(2):'–'}<small>${s.v?'★ Google '+s.r.toFixed(1):'ยังไม่มีคะแนน'}</small></div>
     ${st.sel===s?`<div class="more">${esc(s.sd||'')}${s.ph?`<br>โทร ${esc(s.ph)}`:''}<br><a href="https://www.google.com/maps/place/?q=place_id:${s.id}" target="_blank" rel="noopener">เปิดใน Google Maps</a></div>`:''}
   </li>`).join('')+(arr.length>st.shown?`<li><button class="btn" style="width:100%" id="more">แสดงเพิ่ม (อีก ${fmt(arr.length-st.shown)} ร้าน)</button></li>`:'')||'<li class="loc" style="padding:16px">ไม่มีร้านตามตัวกรองนี้</li>';
@@ -113,7 +129,7 @@ function fitDistrict(){
   map.fitBounds([[Math.min(...xs),Math.min(...ys)],[Math.max(...xs),Math.max(...ys)]],{padding:60,maxZoom:15});
 }
 function legend(){
-  $('legend').innerHTML='<b>รูปร่าง = จำนวนรีวิว</b> · '+VOLS.map((v,i)=>`<span style="white-space:nowrap">${i===0?'★':i===1?'●':'○'} ${v} ${fmt(S.filter(s=>vol(s)===i).length)}</span>`).join(' &nbsp; ')+'<br><b>สี = ระดับคะแนน</b> · '+TIERS.map(t=>`<span style="white-space:nowrap"><span style="color:${t[1]}">●</span> ${t[0]}</span>`).join(' &nbsp; ')+(HASNET?` &nbsp; <span style="color:var(--net);font-weight:700">◯ วงแหวนน้ำเงิน</span> = เครือข่ายมิชลิน ${fmt(S.filter(s=>s.net).length)}`:'');
+  $('legend').innerHTML='<b>รูปร่าง = จำนวนรีวิว</b> · '+VOLS.map((v,i)=>`<span style="white-space:nowrap">${i===0?'★':i===1?'●':'○'} ${v} ${fmt(S.filter(s=>vol(s)===i).length)}</span>`).join(' &nbsp; ')+'<br><b>สี = ระดับคะแนน</b> · '+TIERS.map(t=>`<span style="white-space:nowrap"><span style="color:${t[1]}">●</span> ${t[0]}</span>`).join(' &nbsp; ')+(HASNET?` &nbsp; ${NETLOGO?'<img src="michelin-icon.png" alt="" style="height:16px;vertical-align:middle">':'<span style="color:var(--net);font-weight:700">◯ วงแหวนน้ำเงิน</span>'} = เครือข่ายมิชลิน ${fmt(S.filter(s=>s.net).length)}`:'');
 }
 function upd(){st.shown=60;pushData();renderList();}
 
